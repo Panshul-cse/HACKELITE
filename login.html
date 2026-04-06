@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevMatch — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070b14;--bg2:#0d1422;--bg4:#1a2236;
+  --glass:rgba(255,255,255,0.04);--glass2:rgba(255,255,255,0.07);
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --accent:#6c63ff;--accent2:#a78bfa;--pink:#f472b6;
+  --green:#34d399;--red:#f87171;--amber:#fbbf24;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#475569;
+}
+html,body{width:100%;min-height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center}
+#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);animation:orbdrift var(--dur,20s) ease-in-out infinite alternate;opacity:.15}
+@keyframes orbdrift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(var(--tx,40px),var(--ty,40px)) scale(1.15)}}
+.star{position:absolute;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite;opacity:0}
+@keyframes twinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:var(--o,.5);transform:scale(1)}}
+
+.auth-wrap{position:relative;z-index:1;width:100%;max-width:440px;padding:24px}
+.auth-box{background:rgba(13,20,34,.95);border:1px solid var(--border2);border-radius:24px;padding:36px;backdrop-filter:blur(24px);animation:boxin .4s cubic-bezier(.22,1,.36,1)}
+@keyframes boxin{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.logo-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:28px}
+.logo-ico{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--pink));border-radius:13px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#fff}
+.logo-txt{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;background:linear-gradient(90deg,var(--accent2),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.tab-row{display:flex;background:var(--glass);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:28px;gap:4px}
+.tab{flex:1;padding:9px;border-radius:9px;text-align:center;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;color:var(--text2)}
+.tab.active{background:linear-gradient(135deg,rgba(108,99,255,.3),rgba(167,139,250,.2));color:var(--accent2);border:1px solid rgba(108,99,255,.3)}
+.fg{margin-bottom:16px}
+.fl{font-size:11px;color:var(--text2);margin-bottom:5px;display:block;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.fi{width:100%;background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:all .2s}
+.fi:focus{border-color:var(--accent);background:rgba(108,99,255,.08)}
+.fi::placeholder{color:var(--text3)}
+.fi.err{border-color:var(--red);background:rgba(248,113,113,.06)}
+.err-msg{font-size:11px;color:var(--red);margin-top:4px;display:none}
+.err-msg.show{display:block}
+.btn-auth{width:100%;padding:12px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;box-shadow:0 4px 18px rgba(108,99,255,.35);transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px}
+.btn-auth:hover{transform:translateY(-1px);box-shadow:0 6px 26px rgba(108,99,255,.48);filter:brightness(1.08)}
+.btn-auth:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.divider-row{display:flex;align-items:center;gap:12px;margin:20px 0}
+.divider-row span{font-size:11px;color:var(--text3);white-space:nowrap}
+.divider-row::before,.divider-row::after{content:'';flex:1;height:1px;background:var(--border)}
+.social-btn{width:100%;padding:10px;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--glass);color:var(--text2);font-family:'DM Sans',sans-serif;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+.social-btn:hover{background:var(--glass2);color:var(--text);border-color:var(--border2)}
+.hint{font-size:11px;color:var(--text3);text-align:center;margin-top:18px;line-height:1.6}
+.hint a{color:var(--accent2);cursor:pointer;text-decoration:none}
+.hint a:hover{text-decoration:underline}
+.strength-bar{height:3px;border-radius:100px;background:var(--border);margin-top:6px;overflow:hidden}
+.strength-fill{height:100%;border-radius:100px;transition:width .3s,background .3s;width:0%}
+.strength-lbl{font-size:10px;margin-top:3px}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{background:var(--bg4);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:10px;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.5);animation:tin .35s cubic-bezier(.22,1,.36,1);max-width:300px}
+@keyframes tin{from{transform:translateX(120%);opacity:0}to{transform:none;opacity:1}}
+@keyframes tout{to{transform:translateX(120%);opacity:0}}
+.toast.out{animation:tout .28s ease forwards}
+.t-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+select.fi option{background:#1a2236;color:var(--text)}
+</style>
+</head>
+<body>
+<div id="bg-canvas"></div>
+<div id="toast-wrap"></div>
+
+<div class="auth-wrap">
+  <div class="auth-box">
+    <div class="logo-row">
+      <div class="logo-ico">D</div>
+      <span class="logo-txt">DevMatch</span>
+    </div>
+
+    <div class="tab-row">
+      <div class="tab active" id="tab-login" onclick="switchTab('login')">Sign In</div>
+      <div class="tab" id="tab-register" onclick="switchTab('register')">Create Account</div>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <div class="fg">
+        <label class="fl">Email</label>
+        <input class="fi" type="email" id="l-email" placeholder="you@example.com" required autocomplete="email">
+        <div class="err-msg" id="l-email-err"></div>
+      </div>
+      <div class="fg">
+        <label class="fl">Password</label>
+        <input class="fi" type="password" id="l-pass" placeholder="Your password" required autocomplete="current-password">
+        <div class="err-msg" id="l-pass-err"></div>
+      </div>
+      <div class="err-msg" id="l-global-err" style="margin-bottom:12px;font-size:12px;padding:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px"></div>
+      <button class="btn-auth" type="submit" id="login-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Sign In
+      </button>
+      <div class="divider-row"><span>or continue with</span></div>
+      <button type="button" class="social-btn" onclick="handleGuestLogin()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Continue as Guest
+      </button>
+      <div class="hint">Don't have an account? <a onclick="switchTab('register')">Create one free →</a></div>
+    </form>
+
+    <!-- REGISTER FORM -->
+    <form id="register-form" style="display:none" onsubmit="handleRegister(event)">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fg">
+          <label class="fl">Full Name</label>
+          <input class="fi" type="text" id="r-name" placeholder="Arjun Kapoor" required autocomplete="name">
+          <div class="err-msg" id="r-name-err"></div>
+        </div>
+        <div class="fg">
+          <label class="fl">Preferred Role</label>
+          <select class="fi" id="r-role" required>
+            <option value="">Select role</option>
+            <option>Full Stack</option><option>Frontend</option><option>Backend</option>
+            <option>ML/AI</option><option>UI/UX</option><option>Blockchain</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Email</label>
+        <input class="fi" type="email" id="r-email" placeholder="you@example.com" required autocomplete="email">
+        <div class="err-msg" id="r-email-err"></div>
+      </div>
+      <div class="fg">
+        <label class="fl">Password</label>
+        <input class="fi" type="password" id="r-pass" placeholder="Min 8 characters" required autocomplete="new-password" oninput="checkStrength(this.value)">
+        <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+        <div class="strength-lbl" id="strength-lbl" style="color:var(--text3)"></div>
+        <div class="err-msg" id="r-pass-err"></div>
+      </div>
+      <div class="fg">
+        <label class="fl">Confirm Password</label>
+        <input class="fi" type="password" id="r-pass2" placeholder="Repeat password" required autocomplete="new-password">
+        <div class="err-msg" id="r-pass2-err"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fg">
+          <label class="fl">Experience</label>
+          <select class="fi" id="r-exp" required>
+            <option value="">Select</option>
+            <option>Beginner</option><option>Intermediate</option><option>Advanced</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Domain</label>
+          <select class="fi" id="r-domain" required>
+            <option value="">Select</option>
+            <option>Fintech</option><option>Healthtech</option><option>Edtech</option>
+            <option>AI</option><option>Web3</option><option>Sustainability</option><option>Open Innovation</option>
+          </select>
+        </div>
+      </div>
+      <div class="err-msg" id="r-global-err" style="margin-bottom:12px;font-size:12px;padding:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px"></div>
+      <button class="btn-auth" type="submit" id="register-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        Create Account
+      </button>
+      <div class="hint">Already have an account? <a onclick="switchTab('login')">Sign in →</a></div>
+    </form>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  initBgEffects();
+  // Redirect if already logged in
+  if(Auth.isLoggedIn()) window.location.href='devmatch.html';
+</script>
+</body>
+</html>

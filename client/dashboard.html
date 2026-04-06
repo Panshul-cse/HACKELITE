@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - DevMatch</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="/dashboard.html" class="logo">DevMatch</a>
+            <ul class="nav-links">
+                <li><a href="/dashboard.html">Dashboard</a></li>
+                <li><a href="/match.html">Find Matches</a></li>
+                <li><a href="/team.html">My Teams</a></li>
+                <li><button id="logoutBtn" class="btn-logout">Logout</button></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="user-profile">
+                <div class="profile-avatar" id="profileAvatar">JD</div>
+                <h3 id="userName">User Name</h3>
+                <p id="userEmail">user@email.com</p>
+                <a href="#" class="edit-profile">Edit Profile</a>
+            </div>
+            <ul class="sidebar-menu">
+                <li><a href="/dashboard.html" class="active">Overview</a></li>
+                <li><a href="/match.html">Find Developers</a></li>
+                <li><a href="/team.html">My Teams</a></li>
+                <li><a href="#" class="messages-link">Messages</a></li>
+                <li><a href="#" class="settings-link">Settings</a></li>
+            </ul>
+        </aside>
+
+        <main class="dashboard-content">
+            <section class="dashboard-header">
+                <h1>Welcome, <span id="firstName">User</span>!</h1>
+                <p>Here's an overview of your DevMatch activity</p>
+            </section>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>Profile Views</h4>
+                    <p class="stat-number" id="profileViews">0</p>
+                </div>
+                <div class="stat-card">
+                    <h4>Match Requests</h4>
+                    <p class="stat-number" id="matchRequests">0</p>
+                </div>
+                <div class="stat-card">
+                    <h4>Teams</h4>
+                    <p class="stat-number" id="teamsCount">0</p>
+                </div>
+                <div class="stat-card">
+                    <h4>Connections</h4>
+                    <p class="stat-number" id="connectionsCount">0</p>
+                </div>
+            </div>
+
+            <section class="recent-activity">
+                <h2>Recent Activity</h2>
+                <div id="activityList" class="activity-list">
+                    <p>No recent activity yet. Start by <a href="/match.html">finding developers</a>!</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

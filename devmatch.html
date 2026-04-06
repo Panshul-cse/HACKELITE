@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevMatch — Smart Hackathon Teammate Matching</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   RESET & ROOT
+═══════════════════════════════════════════════ */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070b14;
+  --bg2:#0d1422;
+  --bg3:#111827;
+  --bg4:#1a2236;
+  --glass:rgba(255,255,255,0.04);
+  --glass2:rgba(255,255,255,0.07);
+  --border:rgba(255,255,255,0.08);
+  --border2:rgba(255,255,255,0.14);
+  --accent:#6c63ff;
+  --accent2:#a78bfa;
+  --accent3:#38bdf8;
+  --green:#34d399;
+  --pink:#f472b6;
+  --amber:#fbbf24;
+  --red:#f87171;
+  --orange:#fb923c;
+  --text:#e2e8f0;
+  --text2:#94a3b8;
+  --text3:#475569;
+  --r:16px;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow:hidden}
+
+/* ═══════════════════════════════════════════════
+   BACKGROUND EFFECTS
+═══════════════════════════════════════════════ */
+#bg-canvas{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);animation:orbdrift var(--dur,20s) ease-in-out infinite alternate;opacity:.18}
+@keyframes orbdrift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(var(--tx,40px),var(--ty,40px)) scale(1.15)}}
+.star{position:absolute;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite;opacity:0}
+@keyframes twinkle{0%,100%{opacity:0;transform:scale(.5)}50%{opacity:var(--o,.5);transform:scale(1)}}
+.grid-line{position:absolute;background:rgba(255,255,255,.02)}
+
+/* ═══════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════ */
+#app{position:relative;z-index:1;display:flex;height:100vh;width:100vw}
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════════ */
+#sidebar{
+  width:72px;min-width:72px;
+  background:rgba(7,11,20,.95);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;
+  padding:16px 0 20px;gap:4px;
+  backdrop-filter:blur(24px);
+  transition:width .3s cubic-bezier(.22,1,.36,1),min-width .3s;
+  overflow:hidden;z-index:100;
+}
+#sidebar.open{width:230px;min-width:230px}
+.sb-logo-row{
+  display:flex;align-items:center;gap:10px;
+  width:100%;padding:0 14px;margin-bottom:18px;
+  cursor:pointer;flex-shrink:0;
+}
+.sb-logo{
+  width:40px;height:40px;min-width:40px;
+  background:linear-gradient(135deg,var(--accent),var(--pink));
+  border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#fff;
+  transition:transform .2s;flex-shrink:0;
+}
+.sb-logo:hover{transform:scale(1.08) rotate(-3deg)}
+.sb-logo-text{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:20px;
+  background:linear-gradient(90deg,var(--accent2),var(--pink));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  white-space:nowrap;opacity:0;transition:opacity .2s;pointer-events:none;
+}
+#sidebar.open .sb-logo-text{opacity:1}
+.nav-btn{
+  display:flex;align-items:center;gap:12px;
+  width:calc(100% - 16px);height:44px;padding:0 12px;
+  border-radius:12px;cursor:pointer;transition:all .2s;
+  color:var(--text2);position:relative;flex-shrink:0;
+  border:1px solid transparent;
+}
+.nav-btn:hover{background:var(--glass2);color:var(--text);border-color:var(--border)}
+.nav-btn.active{
+  background:linear-gradient(135deg,rgba(108,99,255,.2),rgba(167,139,250,.12));
+  color:var(--accent2);border-color:rgba(108,99,255,.25);
+}
+.nav-btn svg{width:18px;height:18px;flex-shrink:0}
+.nav-label{font-size:13px;font-weight:500;white-space:nowrap;opacity:0;transition:opacity .15s;pointer-events:none}
+#sidebar.open .nav-label{opacity:1}
+.nav-dot{
+  width:7px;height:7px;background:var(--pink);border-radius:50%;
+  position:absolute;top:8px;right:8px;border:1.5px solid var(--bg);
+  flex-shrink:0;
+}
+#sidebar.open .nav-dot{top:50%;right:12px;transform:translateY(-50%)}
+.sb-sep{width:40px;height:1px;background:var(--border);margin:6px 0;flex-shrink:0;transition:width .3s}
+#sidebar.open .sb-sep{width:calc(100% - 20px)}
+
+/* ═══════════════════════════════════════════════
+   MAIN AREA
+═══════════════════════════════════════════════ */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* TOPBAR */
+#topbar{
+  height:60px;min-height:60px;
+  background:rgba(7,11,20,.85);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:14px;
+  backdrop-filter:blur(24px);flex-shrink:0;
+}
+.page-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;white-space:nowrap}
+.search-wrap{flex:1;max-width:420px;position:relative}
+.search-wrap input{
+  width:100%;background:var(--glass);border:1px solid var(--border);
+  border-radius:10px;padding:8px 12px 8px 36px;color:var(--text);
+  font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:all .2s;
+}
+.search-wrap input::placeholder{color:var(--text3)}
+.search-wrap input:focus{border-color:var(--accent);background:rgba(108,99,255,.08)}
+.search-ico{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none}
+.tb-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--glass);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;color:var(--text2);position:relative;
+}
+.icon-btn:hover{background:var(--glass2);color:var(--text);border-color:var(--border2)}
+.icon-btn .dot{position:absolute;top:5px;right:5px;width:7px;height:7px;background:var(--pink);border-radius:50%;border:1.5px solid var(--bg)}
+.av-btn{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--pink));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:12px;color:#fff;cursor:pointer;
+  border:2px solid transparent;transition:all .2s;
+}
+.av-btn:hover{border-color:var(--accent2)}
+
+/* CONTENT */
+#content{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+#content::-webkit-scrollbar{width:4px}
+#content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* ═══════════════════════════════════════════════
+   PAGE SYSTEM
+═══════════════════════════════════════════════ */
+.page{display:none}
+.page.active{display:block;animation:pagein .35s cubic-bezier(.22,1,.36,1)}
+@keyframes pagein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ═══════════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════════ */
+.card{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--r);padding:20px;
+  position:relative;overflow:hidden;transition:all .25s;
+}
+.card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.025) 0%,transparent 100%);
+  pointer-events:none;border-radius:var(--r);
+}
+.card:hover{border-color:var(--border2);background:rgba(255,255,255,.055)}
+
+/* ═══════════════════════════════════════════════
+   GRIDS
+═══════════════════════════════════════════════ */
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+
+/* ═══════════════════════════════════════════════
+   STAT CARDS
+═══════════════════════════════════════════════ */
+.stat{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:14px;padding:18px 18px 16px;position:relative;overflow:hidden;
+  cursor:default;transition:all .3s;
+}
+.stat:hover{transform:translateY(-3px);border-color:var(--border2);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.stat-glow{
+  position:absolute;top:-30px;right:-30px;
+  width:100px;height:100px;border-radius:50%;filter:blur(40px);opacity:.3;
+}
+.stat-val{font-family:'Syne',sans-serif;font-size:34px;font-weight:800;line-height:1.1;margin-bottom:4px}
+.stat-lbl{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.07em}
+.stat-sub{font-size:12px;margin-top:10px;display:flex;align-items:center;gap:4px}
+
+/* ═══════════════════════════════════════════════
+   BADGES & TAGS
+═══════════════════════════════════════════════ */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:500}
+.b-purple{background:rgba(108,99,255,.18);color:var(--accent2);border:1px solid rgba(108,99,255,.3)}
+.b-green{background:rgba(52,211,153,.14);color:var(--green);border:1px solid rgba(52,211,153,.25)}
+.b-pink{background:rgba(244,114,182,.14);color:var(--pink);border:1px solid rgba(244,114,182,.25)}
+.b-blue{background:rgba(56,189,248,.14);color:var(--accent3);border:1px solid rgba(56,189,248,.25)}
+.b-amber{background:rgba(251,191,36,.14);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
+.b-red{background:rgba(248,113,113,.14);color:var(--red);border:1px solid rgba(248,113,113,.25)}
+.b-orange{background:rgba(251,146,60,.14);color:var(--orange);border:1px solid rgba(251,146,60,.25)}
+.skill-tag{
+  display:inline-flex;padding:4px 10px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  border-radius:8px;font-size:12px;color:var(--text2);
+  transition:all .2s;cursor:default;
+}
+.skill-tag:hover{background:rgba(108,99,255,.14);border-color:rgba(108,99,255,.3);color:var(--accent2)}
+
+/* ═══════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 18px;border-radius:10px;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .2s;border:none;font-family:'DM Sans',sans-serif;
+  white-space:nowrap;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;
+  box-shadow:0 4px 18px rgba(108,99,255,.35);
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 26px rgba(108,99,255,.48);filter:brightness(1.08)}
+.btn-primary:active{transform:translateY(0);filter:brightness(.95)}
+.btn-ghost{background:var(--glass);border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{background:var(--glass2);color:var(--text);border-color:var(--border2)}
+.btn-danger{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.25);color:var(--red)}
+.btn-danger:hover{background:rgba(248,113,113,.2)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
+.btn-full{width:100%}
+
+/* ═══════════════════════════════════════════════
+   SECTION HEADERS
+═══════════════════════════════════════════════ */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sh-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px}
+.sh-link{font-size:12px;color:var(--accent2);cursor:pointer;transition:opacity .2s}
+.sh-link:hover{opacity:.7}
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent);margin:16px -20px}
+
+/* ═══════════════════════════════════════════════
+   AVATAR
+═══════════════════════════════════════════════ */
+.av{
+  border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:#fff;flex-shrink:0;
+}
+
+/* ═══════════════════════════════════════════════
+   MATCH CARDS
+═══════════════════════════════════════════════ */
+.match-card{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:20px;padding:22px;transition:all .3s;cursor:pointer;
+  position:relative;overflow:hidden;
+}
+.match-card::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(108,99,255,.07),transparent 60%);
+  opacity:0;transition:opacity .3s;pointer-events:none;border-radius:20px;
+}
+.match-card:hover{border-color:rgba(108,99,255,.4);transform:translateY(-4px);box-shadow:0 20px 50px rgba(108,99,255,.15)}
+.match-card:hover::after{opacity:1}
+
+/* MATCH RING */
+.mring{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+.mring svg{position:absolute;inset:0;width:100%;height:100%}
+.mring-txt{position:relative;z-index:1;font-family:'Syne',sans-serif;font-weight:800;font-size:14px}
+
+/* FILTER PILLS */
+.fp-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.fp{
+  padding:6px 14px;border-radius:100px;font-size:12px;font-weight:500;
+  border:1px solid var(--border);background:var(--glass);color:var(--text2);
+  cursor:pointer;transition:all .2s;
+}
+.fp:hover,.fp.on{background:rgba(108,99,255,.18);border-color:rgba(108,99,255,.4);color:var(--accent2)}
+
+/* ═══════════════════════════════════════════════
+   PROGRESS BARS
+═══════════════════════════════════════════════ */
+.pb-wrap{height:6px;background:rgba(255,255,255,.07);border-radius:100px;overflow:hidden}
+.pb{height:100%;border-radius:100px;transition:width 1s cubic-bezier(.22,1,.36,1)}
+.str-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.str-lbl{font-size:12px;color:var(--text2);width:80px;flex-shrink:0}
+.str-pct{font-size:12px;font-weight:600;width:34px;text-align:right;flex-shrink:0}
+
+/* COMPLETION RING */
+.comp-ring{width:78px;height:78px;position:relative;flex-shrink:0}
+.comp-ring svg{width:100%;height:100%}
+.comp-pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:17px}
+
+/* ═══════════════════════════════════════════════
+   CHAT
+═══════════════════════════════════════════════ */
+.chat-wrap{display:grid;grid-template-columns:260px 1fr;gap:16px;height:calc(100vh - 128px)}
+.chat-convo-list{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);overflow-y:auto;overflow-x:hidden}
+.chat-win{background:var(--glass);border:1px solid var(--border);border-radius:var(--r);display:flex;flex-direction:column;overflow:hidden}
+.chat-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
+.chat-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.chat-footer{padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0}
+.chat-input{
+  flex:1;background:var(--glass2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;color:var(--text);
+  font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s;
+  resize:none;height:42px;
+}
+.chat-input:focus{border-color:var(--accent)}
+.msg{max-width:74%;animation:msgin .25s ease}
+@keyframes msgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.msg-them{align-self:flex-start;display:flex;gap:8px;align-items:flex-end}
+.msg-me{align-self:flex-end}
+.bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.55}
+.bubble-them{background:var(--glass2);border:1px solid var(--border);border-radius:14px 14px 14px 4px;color:var(--text)}
+.bubble-me{background:linear-gradient(135deg,var(--accent),#7c3aed);border-radius:14px 14px 4px 14px;color:#fff}
+.msg-time{font-size:10px;color:var(--text3);margin-top:4px}
+.online-pip{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 6px var(--green);display:inline-block;animation:pip 2s ease-in-out infinite}
+@keyframes pip{0%,100%{box-shadow:0 0 6px var(--green)}50%{box-shadow:0 0 14px var(--green),0 0 4px var(--green)}}
+.convo-item{
+  padding:12px 14px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;border-bottom:1px solid var(--border);transition:background .2s;
+}
+.convo-item:hover,.convo-item.active{background:var(--glass2)}
+.convo-item:last-child{border-bottom:none}
+
+/* AI CHAT */
+.ai-msg{background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.15);border-radius:14px;padding:14px 16px;margin-bottom:10px;font-size:13px;line-height:1.65;color:var(--text)}
+.ai-typing{display:flex;gap:5px;align-items:center;padding:10px 0}
+.dot-anim{width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:dotbounce .8s ease-in-out infinite}
+.dot-anim:nth-child(2){animation-delay:.15s}
+.dot-anim:nth-child(3){animation-delay:.3s}
+@keyframes dotbounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+
+/* ═══════════════════════════════════════════════
+   FORM ELEMENTS
+═══════════════════════════════════════════════ */
+.fg{margin-bottom:16px}
+.fl{font-size:12px;color:var(--text2);margin-bottom:5px;display:block;font-weight:500;text-transform:uppercase;letter-spacing:.05em}
+.fi{
+  width:100%;background:var(--glass);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;color:var(--text);
+  font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:all .2s;
+}
+.fi:focus{border-color:var(--accent);background:rgba(108,99,255,.08)}
+.fi::placeholder{color:var(--text3)}
+select.fi option{background:#1a2236;color:var(--text)}
+.checkbox-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.skill-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.skill-sel{
+  padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;
+  border:1px solid var(--border);background:var(--glass);color:var(--text2);transition:all .2s;
+}
+.skill-sel.on{background:rgba(108,99,255,.18);border-color:rgba(108,99,255,.4);color:var(--accent2)}
+
+/* ═══════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════ */
+#toast-wrap{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{
+  background:var(--bg4);border:1px solid var(--border2);border-radius:12px;
+  padding:12px 16px;display:flex;align-items:center;gap:10px;font-size:13px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);animation:tin .35s cubic-bezier(.22,1,.36,1);
+  max-width:300px;min-width:200px;
+}
+@keyframes tin{from{transform:translateX(120%);opacity:0}to{transform:none;opacity:1}}
+@keyframes tout{to{transform:translateX(120%);opacity:0}}
+.toast.out{animation:tout .28s ease forwards}
+.t-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+
+/* ═══════════════════════════════════════════════
+   LANDING
+═══════════════════════════════════════════════ */
+.landing-wrap{
+  min-height:calc(100vh - 60px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:40px 24px;
+}
+.hero-title{
+  font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(30px,4.5vw,56px);
+  line-height:1.1;
+  background:linear-gradient(135deg,#ffffff 0%,var(--accent2) 45%,var(--pink) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:18px;
+}
+.hero-sub{font-size:clamp(13px,1.8vw,17px);color:var(--text2);max-width:560px;line-height:1.75;margin-bottom:36px}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:780px;width:100%;margin-top:48px}
+.feat{
+  background:var(--glass);border:1px solid var(--border);border-radius:16px;
+  padding:22px 18px;text-align:left;
+  animation:float var(--ft,4s) ease-in-out infinite alternate;transition:border .3s;
+}
+.feat:hover{border-color:var(--border2)}
+@keyframes float{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.feat-ico{font-size:26px;margin-bottom:12px}
+.feat-t{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:6px}
+.feat-d{font-size:12px;color:var(--text2);line-height:1.6}
+.compat-orb{
+  width:160px;height:160px;position:relative;margin:0 auto 36px;
+}
+.compat-orb .c-ring{
+  position:absolute;border-radius:50%;border-style:solid;border-color:transparent;
+  animation:spin var(--sp,8s) linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.how-wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:820px;width:100%;margin-top:28px}
+.how-step{background:var(--glass);border:1px solid var(--border);border-radius:14px;padding:18px 14px;text-align:center}
+.how-num{font-family:'Syne',sans-serif;font-weight:800;font-size:28px;background:linear-gradient(135deg,var(--accent2),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.how-lbl{font-size:12px;color:var(--text2)}
+
+/* MEMBER ROW */
+.mem-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.mem-row:last-child{border-bottom:none}
+
+/* BAR CHART */
+.bar-chart{display:flex;align-items:flex-end;gap:8px;height:90px;padding:6px 0}
+.bar-col{flex:1;border-radius:6px 6px 0 0;transition:height .9s cubic-bezier(.22,1,.36,1);cursor:default}
+.bar-col:hover{filter:brightness(1.2)}
+
+/* PROFILE COMPLETION */
+.pcomp-wrap{display:flex;align-items:center;gap:16px;padding:14px;background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.15);border-radius:12px;margin-bottom:16px}
+
+/* INVITE ROWS */
+.inv-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid var(--border);margin-bottom:8px;transition:border .2s}
+.inv-row:hover{border-color:var(--border2)}
+
+/* MOBILE RESP */
+@media(max-width:900px){
+  .g3,.feat-grid,.how-wrap{grid-template-columns:repeat(2,1fr)}
+  .chat-wrap{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .g2,.g3,.g4,.feat-grid,.how-wrap{grid-template-columns:1fr}
+  #topbar{padding:0 14px;gap:8px}
+  #content{padding:16px}
+}
+
+/* FADE UP */
+.fu{animation:fu .5s cubic-bezier(.22,1,.36,1) both}
+.fu:nth-child(1){animation-delay:0s}
+.fu:nth-child(2){animation-delay:.07s}
+.fu:nth-child(3){animation-delay:.14s}
+.fu:nth-child(4){animation-delay:.21s}
+.fu:nth-child(5){animation-delay:.28s}
+@keyframes fu{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+/* HIGHLIGHT SEARCH */
+.hl{background:rgba(108,99,255,.25);border-radius:2px}
+
+/* LOADING SPINNER */
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent2);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<!-- BG -->
+<div id="bg-canvas"></div>
+<!-- TOAST -->
+<div id="toast-wrap"></div>
+
+<!-- APP -->
+<div id="app">
+
+<!-- ═══ SIDEBAR ═══ -->
+<nav id="sidebar">
+  <div class="sb-logo-row" onclick="toggleSidebar()">
+    <div class="sb-logo">D</div>
+    <span class="sb-logo-text">DevMatch</span>
+  </div>
+
+  <div class="nav-btn active" id="nav-dashboard" onclick="goPage('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="nav-label">Dashboard</span>
+  </div>
+
+  <div class="nav-btn" id="nav-discover" onclick="goPage('discover')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <span class="nav-label">Discover</span>
+    <div class="nav-dot"></div>
+  </div>
+
+  <div class="nav-btn" id="nav-team" onclick="goPage('team')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    <span class="nav-label">My Team</span>
+  </div>
+
+  <div class="nav-btn" id="nav-chat" onclick="goPage('chat')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span class="nav-label">Messages</span>
+    <div class="nav-dot"></div>
+  </div>
+
+  <div class="nav-btn" id="nav-ai" onclick="goPage('ai')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+    <span class="nav-label">AI Match Advisor</span>
+  </div>
+
+  <div class="sb-sep"></div>
+
+  <div class="nav-btn" id="nav-profile" onclick="goPage('profile')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span class="nav-label">Profile</span>
+  </div>
+
+  <div class="nav-btn" id="nav-landing" onclick="goPage('landing')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="nav-label">Home</span>
+  </div>
+</nav>
+
+<!-- ═══ MAIN ═══ -->
+<div id="main">
+  <div id="topbar">
+    <span class="page-title" id="pg-title">Dashboard</span>
+    <div class="search-wrap">
+      <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search by name, skill, domain…" id="search-inp" oninput="handleSearch(this.value)">
+    </div>
+    <div class="tb-right">
+      <div class="icon-btn" onclick="toggleNotif()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <div class="dot"></div>
+      </div>
+      <div class="av-btn" onclick="goPage('profile')" style="font-size:11px" id="topbar-avatar">AK</div>
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- ════════════ LANDING ════════════ -->
+    <div class="page" id="page-landing">
+      <div class="landing-wrap">
+        <div class="compat-orb">
+          <div class="c-ring" style="inset:0;border-width:2px;border-top-color:rgba(108,99,255,.7);border-right-color:rgba(108,99,255,.2);--sp:6s"></div>
+          <div class="c-ring" style="inset:14px;border-width:2px;border-top-color:rgba(167,139,250,.6);border-left-color:rgba(167,139,250,.2);--sp:9s;animation-direction:reverse"></div>
+          <div class="c-ring" style="inset:28px;border-width:2px;border-top-color:rgba(244,114,182,.5);border-right-color:rgba(244,114,182,.2);--sp:12s"></div>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px">⬡</div>
+        </div>
+        <div class="badge b-purple" style="margin-bottom:16px;font-size:11px">✦ Smart Hackathon Teammate Matching · Powered by AI</div>
+        <h1 class="hero-title">Find the right teammates.<br>Not just random ones.</h1>
+        <p class="hero-sub">DevMatch uses an AI-powered compatibility engine to connect you with hackathon teammates who complement your skills, align with your goals, and share your domain passion.</p>
+        <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" style="padding:12px 28px;font-size:14px" onclick="goPage('dashboard');toast('🎉','Welcome to DevMatch!','success')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            Get Started
+          </button>
+          <button class="btn btn-ghost" style="padding:12px 28px;font-size:14px" onclick="goPage('discover')">Browse Talent →</button>
+        </div>
+        <div class="how-wrap">
+          <div class="how-step"><div class="how-num">1</div><div class="how-lbl">Build your profile & select skills</div></div>
+          <div class="how-step"><div class="how-num">2</div><div class="how-lbl">AI scores your compatibility</div></div>
+          <div class="how-step"><div class="how-num">3</div><div class="how-lbl">Connect with top matches</div></div>
+          <div class="how-step"><div class="how-num">4</div><div class="how-lbl">Build your dream team & ship</div></div>
+        </div>
+        <div class="feat-grid">
+          <div class="feat" style="--ft:3.5s"><div class="feat-ico">🧠</div><div class="feat-t">Smart Matching Engine</div><div class="feat-d">Weighted compatibility across skills, roles, experience, domain & goals — not just random pairing.</div></div>
+          <div class="feat" style="--ft:4.2s;animation-delay:.4s"><div class="feat-ico">⚡</div><div class="feat-t">Real-time Messaging</div><div class="feat-d">Chat instantly with matched teammates. Online indicators, auto-replies, and team rooms.</div></div>
+          <div class="feat" style="--ft:3.8s;animation-delay:.8s"><div class="feat-ico">📊</div><div class="feat-t">Team Strength Visualizer</div><div class="feat-d">See your team's skill coverage in real-time. Balance roles and find missing puzzle pieces.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ DASHBOARD ════════════ -->
+    <div class="page active" id="page-dashboard">
+      <div class="g4" style="margin-bottom:22px" id="stat-grid"></div>
+      <div class="g2" style="margin-bottom:20px">
+        <div class="card fu">
+          <div class="sh"><span class="sh-title">🔥 Top Matches</span><span class="sh-link" onclick="goPage('discover')">View all →</span></div>
+          <div id="dash-matches"></div>
+        </div>
+        <div class="card fu">
+          <div class="sh"><span class="sh-title">📊 Your Analytics</span><span class="badge b-purple">Live</span></div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Compatibility by Role</div>
+          <div class="bar-chart" id="role-chart"></div>
+          <div style="display:flex;gap:0;font-size:10px;color:var(--text3);margin-top:4px">
+            <span style="flex:1;text-align:center">FE</span><span style="flex:1;text-align:center">BE</span><span style="flex:1;text-align:center">ML</span><span style="flex:1;text-align:center">UX</span><span style="flex:1;text-align:center">BC</span>
+          </div>
+          <div class="divider"></div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Your Skills</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px" id="dash-skills"></div>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="card fu">
+          <div class="sh"><span class="sh-title">📬 Pending Invites</span><span class="badge b-pink" id="invite-count">2</span></div>
+          <div id="dash-invites"></div>
+        </div>
+        <div class="card fu">
+          <div class="sh"><span class="sh-title">💬 Recent Messages</span><span class="sh-link" onclick="goPage('chat')">Open →</span></div>
+          <div id="dash-msgs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ DISCOVER ════════════ -->
+    <div class="page" id="page-discover">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="font-size:13px;color:var(--text2);margin-right:4px">Filter by:</div>
+        <div class="fp-row" style="margin-bottom:0;flex:1" id="filter-pills"></div>
+        <select class="fi" style="width:auto;padding:6px 12px;font-size:12px" onchange="sortMatches(this.value)">
+          <option value="score">Sort: Best Match</option>
+          <option value="name">Sort: Name A-Z</option>
+          <option value="exp">Sort: Experience</option>
+        </select>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:16px" id="match-count"></div>
+      <div class="g3" id="match-grid" style="gap:18px"></div>
+    </div>
+
+    <!-- ════════════ TEAM ════════════ -->
+    <div class="page" id="page-team">
+      <div class="g2">
+        <div>
+          <div class="card" style="margin-bottom:18px">
+            <div class="sh">
+              <div>
+                <div class="sh-title">👥 Team Nexus</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:3px">Global AI Challenge 2025</div>
+              </div>
+              <span class="badge b-green">● Active</span>
+            </div>
+            <div id="team-members"></div>
+            <div style="display:flex;gap:8px;margin-top:14px">
+              <button class="btn btn-primary btn-sm" onclick="toast('📨','Invite sent to top match!','success')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Invite Member
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="copyTeamLink()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                Share Link
+              </button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="sh"><span class="sh-title">📬 Sent Invites</span></div>
+            <div id="sent-invites"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sh"><span class="sh-title">⚡ Team Strength</span><span class="badge b-purple">Realtime</span></div>
+          <div id="team-strength"></div>
+          <div class="divider"></div>
+          <div style="text-align:center;padding:10px 0">
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:52px;background:linear-gradient(135deg,var(--accent2),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1">87%</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:6px">Overall Coverage Score</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">Missing: Blockchain expertise</div>
+          </div>
+          <div class="divider"></div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Suggested Additions</div>
+          <div id="team-suggestions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ CHAT ════════════ -->
+    <div class="page" id="page-chat">
+      <div class="chat-wrap">
+        <div class="chat-convo-list">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600">Conversations</div>
+          <div id="convo-list"></div>
+        </div>
+        <div class="chat-win">
+          <div class="chat-header">
+            <div class="av" style="width:38px;height:38px;font-size:13px;font-weight:700" id="chat-peer-av">SR</div>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px" id="chat-peer-name">Sophia Rahman</div>
+              <div style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px">
+                <span class="online-pip"></span> Online · Full Stack ML
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="toast('📹','Video call starting…','info')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              Video
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('📋','Profile opened','info')">Profile</button>
+          </div>
+          <div class="chat-body" id="chat-messages"></div>
+          <div class="chat-footer">
+            <input class="chat-input" type="text" placeholder="Message Sophia…" id="chat-inp" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}">
+            <button class="btn btn-ghost btn-sm" onclick="toast('😊','Emoji picker coming!','info')">😊</button>
+            <button class="btn btn-primary btn-sm" onclick="sendMsg()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ AI ADVISOR ════════════ -->
+    <div class="page" id="page-ai">
+      <div class="g2">
+        <div class="card">
+          <div class="sh">
+            <div>
+              <div class="sh-title">🤖 AI Match Advisor</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:3px">Powered by Claude</div>
+            </div>
+            <span class="badge b-green">● Live AI</span>
+          </div>
+          <p style="font-size:13px;color:var(--text2);line-height:1.65;margin-bottom:16px">Ask our AI anything about team matching, skills to develop, hackathon strategy, or get personalized teammate recommendations.</p>
+          <div id="ai-chat" style="min-height:300px;max-height:420px;overflow-y:auto;margin-bottom:14px;display:flex;flex-direction:column;gap:8px"></div>
+          <div style="display:flex;gap:8px">
+            <input class="fi" type="text" id="ai-input" placeholder="e.g. Who should I add to complete my fintech team?" onkeydown="if(event.key==='Enter')askAI()">
+            <button class="btn btn-primary" onclick="askAI()" id="ai-send-btn">Ask AI</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+            <span style="font-size:11px;color:var(--text3);width:100%;margin-bottom:4px">Quick questions:</span>
+            <button class="btn btn-ghost btn-sm" onclick="aiQuickQ('Who are my best matches and why?')">Best matches?</button>
+            <button class="btn btn-ghost btn-sm" onclick="aiQuickQ('What skills should I develop to get better matches?')">Skill gaps?</button>
+            <button class="btn btn-ghost btn-sm" onclick="aiQuickQ('What makes a winning hackathon team for a fintech project?')">Team strategy</button>
+            <button class="btn btn-ghost btn-sm" onclick="aiQuickQ('How does the matching algorithm score compatibility?')">How scoring works</button>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div class="sh"><span class="sh-title">🎯 Match Breakdown</span></div>
+            <div id="ai-breakdown"></div>
+          </div>
+          <div class="card">
+            <div class="sh"><span class="sh-title">📈 Compatibility Factors</span></div>
+            <div id="ai-factors"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ PROFILE ════════════ -->
+    <div class="page" id="page-profile">
+      <div class="g2">
+        <div>
+          <div class="card" style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px">
+              <div class="av" id="prof-av" style="width:72px;height:72px;border-radius:18px;font-size:26px;font-weight:800">AK</div>
+              <div style="flex:1">
+                <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:20px;margin-bottom:3px" id="prof-name">Arjun Kapoor</div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:8px" id="prof-role-exp">Full Stack · Advanced · Fintech</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap" id="prof-badges"></div>
+              </div>
+              <div class="comp-ring">
+                <svg viewBox="0 0 78 78">
+                  <circle cx="39" cy="39" r="33" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6"/>
+                  <circle cx="39" cy="39" r="33" fill="none" stroke="url(#cg)" stroke-width="6" stroke-linecap="round" stroke-dasharray="207.3" stroke-dashoffset="45.6" transform="rotate(-90 39 39)" id="comp-circle"/>
+                  <defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6c63ff"/><stop offset="100%" stop-color="#f472b6"/></linearGradient></defs>
+                </svg>
+                <div class="comp-pct" id="comp-pct">78%</div>
+              </div>
+            </div>
+            <div class="pcomp-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+              <div style="flex:1">
+                <div style="font-size:12px;font-weight:600;margin-bottom:4px">Profile <span id="comp-pct2">78%</span> complete</div>
+                <div class="pb-wrap"><div class="pb" id="comp-bar" style="width:78%;background:linear-gradient(90deg,var(--accent),var(--pink))"></div></div>
+              </div>
+              <div style="font-size:11px;color:var(--text2)">Add availability ↗</div>
+            </div>
+            <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px" id="prof-bio">Building the future of fintech, one commit at a time. Love hackathons, open source, and strong coffee. Looking for passionate teammates to ship fast.</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px" id="prof-skills"></div>
+          </div>
+          <div class="card">
+            <div class="sh-title" style="margin-bottom:14px">Preferences</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Experience</div><span class="badge b-blue" id="pref-exp">Advanced</span></div>
+              <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Goal</div><span class="badge b-amber" id="pref-goal">Win 🏆</span></div>
+              <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Availability</div><span class="badge b-green" id="pref-avail">Full-time</span></div>
+              <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Domain</div><span class="badge b-purple" id="pref-domain">Fintech</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="sh-title" style="margin-bottom:18px">✏️ Edit Profile</div>
+          <div class="fg">
+            <label class="fl">Full Name</label>
+            <input class="fi" id="f-name" value="Arjun Kapoor" oninput="liveUpdateProfile()">
+          </div>
+          <div class="fg">
+            <label class="fl">Bio</label>
+            <textarea class="fi" id="f-bio" rows="3" style="resize:none" oninput="liveUpdateProfile()">Building the future of fintech, one commit at a time. Love hackathons, open source, and strong coffee. Looking for passionate teammates to ship fast.</textarea>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="fg">
+              <label class="fl">Preferred Role</label>
+              <select class="fi" id="f-role" onchange="liveUpdateProfile()">
+                <option>Full Stack</option><option>Frontend</option><option>Backend</option><option>ML/AI</option><option>UI/UX</option><option>Blockchain</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="fl">Experience</label>
+              <select class="fi" id="f-exp" onchange="liveUpdateProfile()">
+                <option>Advanced</option><option>Intermediate</option><option>Beginner</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="fl">Domain</label>
+              <select class="fi" id="f-domain" onchange="liveUpdateProfile()">
+                <option>Fintech</option><option>Healthtech</option><option>Edtech</option><option>AI</option><option>Web3</option><option>Sustainability</option><option>Open Innovation</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label class="fl">Hackathon Goal</label>
+              <select class="fi" id="f-goal" onchange="liveUpdateProfile()">
+                <option>Win 🏆</option><option>Learn</option><option>Network</option><option>Build Startup</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label class="fl">Availability</label>
+            <select class="fi" id="f-avail" onchange="liveUpdateProfile()">
+              <option>Full-time</option><option>Part-time</option><option>Weekend only</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">Skills (click to toggle)</label>
+            <div class="skill-grid" id="skill-selector"></div>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="saveProfile()" style="margin-top:4px">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   API CONFIGURATION & AUTH
+═══════════════════════════════════════════════════════════════ */
+const API_BASE_URL='http://localhost:5000/api';
+
+// Get auth token
+function getAuthToken(){
+  return localStorage.getItem('authToken');
+}
+
+// Make API calls
+async function apiCall(endpoint,method='GET',data=null){
+  const options={
+    method,
+    headers:{'Content-Type':'application/json'},
+  };
+  const token=getAuthToken();
+  if(token)options.headers['Authorization']=`Bearer ${token}`;
+  if(data)options.body=JSON.stringify(data);
+  try{
+    const res=await fetch(`${API_BASE_URL}${endpoint}`,options);
+    if(!res.ok){
+      if(res.status===401)redirectToLogin();
+      throw new Error(`API error: ${res.status}`);
+    }
+    return await res.json();
+  }catch(e){
+    console.error('API Call Error:',e);
+    throw e;
+  }
+}
+
+function redirectToLogin(){
+  localStorage.removeItem('authToken');
+  window.location.href='/login.html';
+}
+
+// Check authentication on load
+function checkAuth(){
+  if(!getAuthToken()){
+    redirectToLogin();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DATA STORE - Dynamic from Backend
+═══════════════════════════════════════════════════════════════ */
+const ALL_SKILLS=['React','TypeScript','Node.js','Python','MongoDB','Docker','Next.js','GraphQL','Vue.js','Angular','Go','Rust','Solidity','TensorFlow','PyTorch','LangChain','Figma','PostgreSQL','Redis','FastAPI','Three.js','GSAP','AWS','Kubernetes','Hardhat','Framer','Scikit-learn','NLP','Webflow','Ethers.js'];
+
+let MY_PROFILE={
+  name:'Loading...',bio:'',
+  role:'Developer',exp:'intermediate',domain:'',goal:'',avail:'',
+  skills:[],
+  initials:'...',color:'linear-gradient(135deg,#6c63ff,#f472b6)',
+  _id:'',
+};
+
+let USERS=[];
+let chatMessages=[];
+let CONVERSATIONS=[];
+let TEAM_MEMBERS=[];
+let TEAM_STRENGTH=[];
+let aiChatHistory=[];
+let currentFilter='all';
+let currentSort='score';
+let activeConvo=null;
+let replyIdx=0;
+
+const AUTO_REPLIES=[
+  'That sounds great! When can we start working on this?',
+  'I\'m interested! Let\'s talk more about the project.',
+  'Looks like we\'d be a perfect team. When do we begin?',
+  'Count me in! This aligns perfectly with my goals.',
+];
+
+// Generate color gradient for user
+function generateColorGradient(index){
+  const colors=[
+    'linear-gradient(135deg,#6c63ff,#a78bfa)',
+    'linear-gradient(135deg,#f472b6,#fb923c)',
+    'linear-gradient(135deg,#34d399,#06b6d4)',
+    'linear-gradient(135deg,#fbbf24,#f59e0b)',
+    'linear-gradient(135deg,#38bdf8,#818cf8)',
+    'linear-gradient(135deg,#fb7185,#a78bfa)',
+    'linear-gradient(135deg,#a3e635,#16a34a)',
+    'linear-gradient(135deg,#f59e0b,#ef4444)',
+  ];
+  return colors[index%colors.length];
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT & DATA LOADING
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('load',async()=>{
+  checkAuth();
+  initBg();
+  try{
+    await loadAppData();
+    renderAll();
+    toast('🎯','DevMatch loaded successfully!','success');
+  }catch(err){
+    console.error('Failed to load app:',err);
+    toast('❌','Failed to load data. Please refresh.','error');
+  }
+});
+
+async function loadAppData(){
+  try{
+    // Load current user profile
+    const userRes=await apiCall('/auth/me');
+    MY_PROFILE={
+      ...userRes,
+      initials:userRes.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+      color:'linear-gradient(135deg,#6c63ff,#f472b6)',
+      goal:'Win 🏆',
+    };
+
+    // Load all users for matching
+    const usersRes=await apiCall('/users');
+    USERS=usersRes.data.map((u,idx)=>({
+      ...u,
+      initials:u.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+      color:generateColorGradient(idx),
+      score:computeScore(u,MY_PROFILE),
+      desc:u.bio||'No bio available',
+      goal:u.goal||'Win 🏆',
+      filter:getTags(u),
+      online:Math.random()>0.3,
+      why:generateMatchReason(u,MY_PROFILE),
+    }));
+
+    // Load conversations/messages
+    await loadConversations();
+
+    // Load teams
+    await loadTeams();
+  }catch(err){
+    console.error('Error loading data:',err);
+    throw err;
+  }
+}
+
+async function loadConversations(){
+  try{
+    const res=await apiCall('/matches/requests');
+    CONVERSATIONS=res.data.slice(0,4).map((req,idx)=>{
+      const user=req.senderId;
+      return{
+        id:req._id,
+        name:user.name,
+        initials:user.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+        color:generateColorGradient(idx),
+        last:'Sent you a match request',
+        time:'just now',
+        online:Math.random()>0.3,
+        unread:true,
+      };
+    });
+  }catch(err){
+    console.error('Error loading conversations:',err);
+    CONVERSATIONS=[];
+  }
+}
+
+async function loadTeams(){
+  try{
+    const res=await apiCall('/teams');
+    if(res.length>0){
+      const team=res[0];
+      TEAM_MEMBERS=[
+        {
+          name:`${MY_PROFILE.name} (You)`,
+          initials:MY_PROFILE.initials,
+          role:MY_PROFILE.role||'Developer',
+          color:MY_PROFILE.color,
+          tag:'Lead',
+        },
+        ...team.members.slice(1,3).map((m,idx)=>({
+          name:m.name,
+          initials:m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+          role:m.role||'Developer',
+          color:generateColorGradient(idx+1),
+          tag:m.role||'Member',
+        })),
+      ];
+      TEAM_STRENGTH=[
+        {label:'Frontend',val:Math.floor(Math.random()*50+40),color:'#38bdf8'},
+        {label:'Backend',val:Math.floor(Math.random()*50+40),color:'#6c63ff'},
+        {label:'ML / AI',val:Math.floor(Math.random()*50+40),color:'#f472b6'},
+        {label:'UI / UX',val:Math.floor(Math.random()*50+20),color:'#34d399'},
+        {label:'DevOps',val:Math.floor(Math.random()*40+20),color:'#fbbf24'},
+        {label:'Blockchain',val:Math.floor(Math.random()*30+10),color:'#fb923c'},
+      ];
+    }
+  }catch(err){
+    console.error('Error loading teams:',err);
+  }
+}
+
+function getTags(user){
+  const tags=[];
+  if(user.role.includes('Frontend'))tags.push('frontend');
+  if(user.role.includes('Backend'))tags.push('backend');
+  if(user.role.includes('ML')||user.role.includes('AI'))tags.push('ml','ai');
+  if(user.role.includes('UI')||user.role.includes('UX'))tags.push('uiux');
+  if(user.role.includes('Blockchain'))tags.push('blockchain');
+  if(user.domain)tags.push(user.domain.toLowerCase());
+  return tags;
+}
+
+function generateMatchReason(user,myProfile){
+  const sharedSkills=user.skills.filter(s=>myProfile.skills.includes(s)).length;
+  return `${sharedSkills}+ shared skills + domain alignment + complementary role`;
+}
+
+function renderAll(){
+  renderStats();
+  renderDashMatches();
+  renderRoleChart();
+  renderDashSkills();
+  renderDashInvites();
+  renderDashMsgs();
+  renderFilters();
+  renderMatchGrid(getFilteredMatches());
+  renderTeamMembers();
+  renderTeamStrength();
+  renderSentInvites();
+  renderTeamSuggestions();
+  renderConvoList();
+  renderChatMessages();
+  renderProfilePage();
+  renderSkillSelector();
+  renderAIPage();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BACKGROUND
+═══════════════════════════════════════════════════════════════ */
+function initBg(){
+  const c=document.getElementById('bg-canvas');
+  // Orbs
+  [{bg:'#6c63ff',l:'-15%',t:'-10%',s:'550px',dur:'20s',tx:'60px',ty:'50px'},
+   {bg:'#f472b6',r:'-10%',b:'-10%',s:'500px',dur:'25s',tx:'-50px',ty:'-60px'},
+   {bg:'#38bdf8',l:'40%',t:'15%',s:'300px',dur:'16s',tx:'30px',ty:'20px'}
+  ].forEach(o=>{
+    const d=document.createElement('div');
+    d.className='orb';
+    d.style.cssText=`width:${o.s};height:${o.s};background:${o.bg};${o.l?'left:'+o.l:'right:'+o.r};${o.t?'top:'+o.t:'bottom:'+o.b};--dur:${o.dur};--tx:${o.tx};--ty:${o.ty}`;
+    c.appendChild(d);
+  });
+  // Stars
+  for(let i=0;i<80;i++){
+    const s=document.createElement('div');s.className='star';
+    const sz=Math.random()*2+.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;background:#fff;--d:${2+Math.random()*5}s;--o:${.15+Math.random()*.5};animation-delay:${Math.random()*6}s`;
+    c.appendChild(s);
+  }
+  // Grid lines
+  for(let i=0;i<8;i++){
+    const h=document.createElement('div');h.className='grid-line';
+    h.style.cssText=`left:0;right:0;height:1px;top:${(i+1)*12.5}%`;
+    c.appendChild(h);
+    const v=document.createElement('div');v.className='grid-line';
+    v.style.cssText=`top:0;bottom:0;width:1px;left:${(i+1)*12.5}%`;
+    c.appendChild(v);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════════════════════ */
+const PAGE_TITLES={dashboard:'Dashboard',discover:'Discover Teammates',team:'My Team',chat:'Messages',ai:'AI Match Advisor',profile:'Profile',landing:'DevMatch'};
+
+function goPage(pg){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(n=>n.classList.remove('active'));
+  const pel=document.getElementById('page-'+pg);
+  if(pel)pel.classList.add('active');
+  const nel=document.getElementById('nav-'+pg);
+  if(nel)nel.classList.add('active');
+  document.getElementById('pg-title').textContent=PAGE_TITLES[pg]||'DevMatch';
+  // Animate strength bars when team page opens
+  if(pg==='team'){setTimeout(animateStrengthBars,200)}
+}
+
+let sbOpen=false;
+function toggleSidebar(){
+  sbOpen=!sbOpen;
+  document.getElementById('sidebar').classList.toggle('open',sbOpen);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════ */
+function toast(icon,msg,type='success'){
+  const c=document.getElementById('toast-wrap');
+  const colors={success:getComputedStyle(document.documentElement).getPropertyValue('--green').trim(),info:getComputedStyle(document.documentElement).getPropertyValue('--accent3').trim(),warning:getComputedStyle(document.documentElement).getPropertyValue('--amber').trim(),error:getComputedStyle(document.documentElement).getPropertyValue('--red').trim()};
+  const col=colors[type]||colors.info;
+  const el=document.createElement('div');el.className='toast';
+  el.innerHTML=`<div class="t-ico" style="background:${col}22;color:${col}">${icon}</div><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),300)},3200);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MATCH RING SVG
+═══════════════════════════════════════════════════════════════ */
+function matchRing(score){
+  const r=27,circ=2*Math.PI*r;
+  const dash=circ*(score/100),gap=circ-dash;
+  const col=score>=90?'#34d399':score>=80?'#a78bfa':score>=70?'#38bdf8':'#fbbf24';
+  return`<div class="mring">
+    <svg viewBox="0 0 62 62" style="transform:rotate(-90deg)">
+      <circle cx="31" cy="31" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="5"/>
+      <circle cx="31" cy="31" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${gap.toFixed(1)}" opacity=".9"/>
+    </svg>
+    <span class="mring-txt" style="color:${col}">${score}%</span>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MATCHING ENGINE (Frontend Implementation)
+═══════════════════════════════════════════════════════════════ */
+function computeScore(user,profile){
+  let score=0;
+  // Skill overlap 35%
+  const sharedSkills=user.skills.filter(s=>profile.skills.includes(s));
+  const skillScore=(sharedSkills.length/Math.max(user.skills.length,profile.skills.length))*35;
+  score+=skillScore;
+  // Complementary role 20%
+  const roleCompat={Frontend:['Backend','Full Stack','ML/AI'],'ML/AI':['Backend','Full Stack','Frontend'],Backend:['Frontend','Full Stack','ML/AI'],'Full Stack':['ML/AI','UI/UX','Blockchain'],'UI/UX':['Frontend','Full Stack','Backend'],Blockchain:['Backend','Full Stack','ML/AI']};
+  const compat=roleCompat[profile.role]||[];
+  if(compat.includes(user.role))score+=20;
+  else if(user.role===profile.role)score+=8;
+  // Domain match 15%
+  if(user.domain===profile.domain)score+=15;
+  else if(['AI','Fintech'].includes(user.domain)&&['AI','Fintech'].includes(profile.domain))score+=8;
+  // Experience 10%
+  const expMap={Beginner:1,Intermediate:2,Advanced:3};
+  const expDiff=Math.abs((expMap[user.exp]||2)-(expMap[profile.exp]||2));
+  score+=expDiff===0?10:expDiff===1?6:2;
+  // Availability 10%
+  if(user.avail===profile.avail)score+=10;
+  else if(user.avail==='Full-time'||profile.avail==='Full-time')score+=4;
+  // Goal 10%
+  if(user.goal===profile.goal)score+=10;
+  else if([user.goal,profile.goal].includes('Win 🏆'))score+=4;
+  return Math.min(99,Math.round(score));
+}
+
+function getFilteredMatches(){
+  let users=[...USERS];
+  if(currentFilter!=='all')users=users.filter(u=>u.filter.includes(currentFilter));
+  // Recompute scores based on current profile
+  users=users.map(u=>({...u,score:computeScore(u,MY_PROFILE)}));
+  if(currentSort==='score')users.sort((a,b)=>b.score-a.score);
+  else if(currentSort==='name')users.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(currentSort==='exp')users.sort((a,b)=>({Advanced:3,Intermediate:2,Beginner:1}[b.exp]||2)-({Advanced:3,Intermediate:2,Beginner:1}[a.exp]||2));
+  return users;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER DASHBOARD
+═══════════════════════════════════════════════════════════════ */
+function renderStats(){
+  const topScore=Math.max(...USERS.map(u=>computeScore(u,MY_PROFILE)));
+  const el=document.getElementById('stat-grid');
+  el.innerHTML=[
+    {val:`${topScore}%`,lbl:'Top Match Score',sub:'▲ 8% this week',subc:'#34d399',glow:'var(--accent)'},
+    {val:'12',lbl:'New Matches Today',sub:'▲ 3 new profiles',subc:'#34d399',glow:'var(--green)'},
+    {val:'3',lbl:'Pending Invites',sub:'● 2 awaiting reply',subc:'var(--amber)',glow:'var(--pink)'},
+    {val:'78%',lbl:'Profile Complete',sub:'→ Add availability',subc:'var(--text3)',glow:'var(--accent3)'},
+  ].map((s,i)=>`
+    <div class="stat fu">
+      <div class="stat-glow" style="background:${s.glow}"></div>
+      <div class="stat-val" style="background:linear-gradient(135deg,${['var(--accent2)','var(--green)','var(--pink)','var(--accent3)'][i]},${['var(--pink)','var(--accent3)','var(--amber)','var(--accent2)'][i]});-webkit-background-clip:text;-webkit-text-fill-color:transparent">${s.val}</div>
+      <div class="stat-lbl">${s.lbl}</div>
+      <div class="stat-sub" style="color:${s.subc}">${s.sub}</div>
+    </div>`).join('');
+}
+
+function renderDashMatches(){
+  const el=document.getElementById('dash-matches');
+  const matches=getFilteredMatches().slice(0,5);
+  el.innerHTML=matches.map(u=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:9px;border-radius:11px;cursor:pointer;transition:all .2s;border:1px solid transparent" onmouseenter="this.style.background='rgba(255,255,255,.04)';this.style.borderColor='var(--border)'" onmouseleave="this.style.background='';this.style.borderColor='transparent'" onclick="goPage('discover');toast('👁️','Viewing ${u.name.replace(/'/g,"\\'")}','info')">
+      <div class="av" style="width:40px;height:40px;font-size:13px;font-weight:700;background:${u.color}">${u.initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.name}</div>
+        <div style="font-size:11px;color:var(--text2)">${u.role} · ${u.domain}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;background:linear-gradient(135deg,var(--accent2),var(--pink));-webkit-background-clip:text;-webkit-text-fill-color:transparent">${u.score}%</div>
+        <div style="font-size:10px;color:var(--text3)">match</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderRoleChart(){
+  const el=document.getElementById('role-chart');
+  const vals=[88,72,94,65,35],colors=['#38bdf8','#6c63ff','#f472b6','#34d399','#fb923c'];
+  el.innerHTML=vals.map((v,i)=>`<div class="bar-col" style="height:${v}%;background:${colors[i]};opacity:.85" title="${['FE','BE','ML','UX','BC'][i]}: ${v}%"></div>`).join('');
+}
+
+function renderDashSkills(){
+  const el=document.getElementById('dash-skills');
+  el.innerHTML=MY_PROFILE.skills.map(s=>`<span class="skill-tag">${s}</span>`).join('');
+}
+
+function renderDashInvites(){
+  const el=document.getElementById('dash-invites');
+  const invites=[
+    {name:'Sophia Rahman',team:'AI Nexus',color:'linear-gradient(135deg,#6c63ff,#a78bfa)',initials:'SR'},
+    {name:'Fatima Al-Noor',team:'HealthAI',color:'linear-gradient(135deg,#fb7185,#a78bfa)',initials:'FA'},
+    {name:'Dev Sharma',team:'FinBot',color:'linear-gradient(135deg,#fbbf24,#f59e0b)',initials:'DS'},
+  ];
+  el.innerHTML=invites.map(i=>`
+    <div class="inv-row">
+      <div class="av" style="width:38px;height:38px;font-size:12px;background:${i.color}">${i.initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${i.name}</div>
+        <div style="font-size:11px;color:var(--text2)">Team: ${i.team}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="acceptInvite(this,'${i.name.replace(/'/g,"\\'")}','${i.team}')">Accept</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="this.closest('.inv-row').remove();updateInviteCount()">✕</button>
+    </div>`).join('');
+}
+
+function acceptInvite(btn,name,team){
+  btn.closest('.inv-row').remove();
+  updateInviteCount();
+  toast('🎉',`Joined team ${team}!`,'success');
+  setTimeout(()=>renderTeamMembers(),100);
+}
+function updateInviteCount(){
+  const cnt=document.querySelectorAll('.inv-row').length;
+  document.getElementById('invite-count').textContent=cnt;
+}
+
+function renderDashMsgs(){
+  const el=document.getElementById('dash-msgs');
+  el.innerHTML=CONVERSATIONS.slice(0,3).map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px;border-radius:11px;cursor:pointer;transition:all .2s;margin-bottom:4px" onclick="goPage('chat')" onmouseenter="this.style.background='rgba(255,255,255,.04)'" onmouseleave="this.style.background=''">
+      <div style="position:relative">
+        <div class="av" style="width:38px;height:38px;font-size:12px;border-radius:10px;background:${c.color}">${c.initials}</div>
+        ${c.online?'<div style="position:absolute;bottom:-2px;right:-2px;width:9px;height:9px;background:var(--green);border-radius:50%;border:2px solid var(--bg)"></div>':''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${c.unread?600:400}">${c.name}</div>
+        <div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.last}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        <div style="font-size:10px;color:var(--text3)">${c.time}</div>
+        ${c.unread?'<div style="width:7px;height:7px;background:var(--accent2);border-radius:50%"></div>':''}
+      </div>
+    </div>`).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DISCOVER PAGE
+═══════════════════════════════════════════════════════════════ */
+const FILTERS=[
+  {id:'all',label:'All'},
+  {id:'frontend',label:'Frontend'},
+  {id:'backend',label:'Backend'},
+  {id:'ml',label:'ML / AI'},
+  {id:'uiux',label:'UI/UX'},
+  {id:'blockchain',label:'Blockchain'},
+  {id:'fintech',label:'Fintech'},
+  {id:'healthtech',label:'Healthtech'},
+  {id:'web3',label:'Web3'},
+  {id:'ai',label:'AI Domain'},
+  {id:'edtech',label:'Edtech'},
+];
+
+function renderFilters(){
+  document.getElementById('filter-pills').innerHTML=FILTERS.map(f=>`<span class="fp ${f.id==='all'?'on':''}" data-f="${f.id}" onclick="setFilter('${f.id}',this)">${f.label}</span>`).join('');
+}
+
+function setFilter(f,el){
+  currentFilter=f;
+  document.querySelectorAll('.fp').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  renderMatchGrid(getFilteredMatches());
+}
+
+function sortMatches(val){currentSort=val;renderMatchGrid(getFilteredMatches())}
+
+function renderMatchGrid(users){
+  const el=document.getElementById('match-grid');
+  const cnt=document.getElementById('match-count');
+  if(cnt)cnt.textContent=`${users.length} developer${users.length!==1?'s':''} found`;
+  if(!users.length){el.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text2)"><div style="font-size:40px;margin-bottom:12px">🔍</div><div>No matches for this filter</div></div>';return}
+  el.innerHTML=users.map(u=>`
+    <div class="match-card fu" onclick="showUserModal(${u.id})">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="position:relative">
+          <div class="av" style="width:50px;height:50px;border-radius:14px;font-size:16px;font-weight:700;background:${u.color}">${u.initials}</div>
+          ${u.online?'<div style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;background:var(--green);border-radius:50%;border:2.5px solid var(--bg)"></div>':''}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.name}</div>
+          <div style="font-size:11px;color:var(--text2)">${u.role} · ${u.exp}</div>
+        </div>
+        ${matchRing(u.score)}
+      </div>
+      <p style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${u.desc}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">
+        ${u.skills.slice(0,3).map(s=>`<span class="skill-tag">${s}</span>`).join('')}
+        ${u.skills.length>3?`<span class="skill-tag">+${u.skills.length-3}</span>`:''}
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="badge b-purple">${u.exp}</span>
+        <span class="badge b-blue">${u.domain}</span>
+        <span class="badge ${u.goal==='Win 🏆'?'b-amber':'b-green'}">${u.goal}</span>
+        <span class="badge ${u.online?'b-green':'b-red'}">${u.online?'● Online':'○ Away'}</span>
+      </div>
+      <div style="background:rgba(108,99,255,.07);border:1px solid rgba(108,99,255,.12);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:var(--accent2);line-height:1.5">
+        ✦ ${u.why}
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="event.stopPropagation();sendInvite('${u.name.replace(/'/g,"\\'")}')">Connect</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openChat('${u.name.replace(/'/g,"\\'")}','${u.initials}','${u.color}')">Chat</button>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showUserModal(${u.id})">View</button>
+      </div>
+    </div>`).join('');
+}
+
+function sendInvite(name){toast('📨',`Invite sent to ${name}!`,'success')}
+function openChat(name,initials,color){
+  document.getElementById('chat-peer-name').textContent=name;
+  document.getElementById('chat-peer-av').textContent=initials;
+  document.getElementById('chat-peer-av').style.background=color;
+  goPage('chat');
+}
+
+/* USER MODAL */
+function showUserModal(id){
+  const u=USERS.find(x=>x.id===id);if(!u)return;
+  const score=computeScore(u,MY_PROFILE);
+  const shared=u.skills.filter(s=>MY_PROFILE.skills.includes(s));
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(7,11,20,.85);backdrop-filter:blur(8px);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;animation:pagein .3s ease';
+  overlay.innerHTML=`
+    <div style="background:#0d1422;border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:30px;max-width:520px;width:100%;position:relative;max-height:90vh;overflow-y:auto">
+      <button onclick="this.closest('[style]').remove()" style="position:absolute;top:16px;right:16px;background:var(--glass);border:1px solid var(--border);color:var(--text2);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">✕</button>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div class="av" style="width:64px;height:64px;border-radius:18px;font-size:22px;background:${u.color}">${u.initials}</div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px">${u.name}</div>
+          <div style="color:var(--text2);font-size:13px;margin-top:2px">${u.role} · ${u.exp} · ${u.domain}</div>
+        </div>
+        <div style="margin-left:auto">${matchRing(score)}</div>
+      </div>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:18px">${u.desc}</p>
+      <div style="background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.15);border-radius:10px;padding:12px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--accent2);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Why you match</div>
+        <div style="font-size:13px;color:var(--text)">${u.why}</div>
+      </div>
+      ${shared.length>0?`<div style="margin-bottom:16px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Shared Skills (${shared.length})</div><div style="display:flex;gap:5px;flex-wrap:wrap">${shared.map(s=>`<span class="skill-tag" style="border-color:rgba(108,99,255,.4);color:var(--accent2)">${s}</span>`).join('')}</div></div>`:''}
+      <div style="margin-bottom:18px"><div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">All Skills</div><div style="display:flex;gap:5px;flex-wrap:wrap">${u.skills.map(s=>`<span class="skill-tag">${s}</span>`).join('')}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
+        <div style="background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Goal</div><div class="badge b-amber">${u.goal}</div></div>
+        <div style="background:var(--glass);border:1px solid var(--border);border-radius:10px;padding:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Availability</div><div class="badge b-green">${u.avail}</div></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" style="flex:1" onclick="sendInvite('${u.name}');this.closest('[style]').remove()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Send Invite
+        </button>
+        <button class="btn btn-ghost" style="flex:1" onclick="openChat('${u.name}','${u.initials}','${u.color}');this.closest('[style]').remove()">💬 Message</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TEAM PAGE
+═══════════════════════════════════════════════════════════════ */
+function renderTeamMembers(){
+  const el=document.getElementById('team-members');
+  el.innerHTML=TEAM_MEMBERS.map(m=>`
+    <div class="mem-row">
+      <div class="av" style="width:42px;height:42px;font-size:13px;background:${m.color}">${m.initials}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${m.name}</div>
+        <div style="font-size:11px;color:var(--text2)">${m.role}</div>
+      </div>
+      <span class="badge b-purple">${m.tag}</span>
+      ${m.initials!=='AK'?`<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="toast('💬','Opening chat…','info');goPage('chat')">Chat</button>`:''}
+    </div>`).join('');
+}
+
+function renderTeamStrength(){
+  const el=document.getElementById('team-strength');
+  el.innerHTML=TEAM_STRENGTH.map(s=>`
+    <div class="str-row">
+      <div class="str-lbl">${s.label}</div>
+      <div style="flex:1;height:8px;background:rgba(255,255,255,.07);border-radius:100px;overflow:hidden">
+        <div class="str-bar" data-w="${s.val}" style="height:100%;border-radius:100px;width:0%;background:${s.color};transition:width 1.1s cubic-bezier(.22,1,.36,1)"></div>
+      </div>
+      <div class="str-pct" style="color:${s.color}">${s.val}%</div>
+    </div>`).join('');
+}
+
+function animateStrengthBars(){
+  document.querySelectorAll('.str-bar[data-w]').forEach(b=>{
+    setTimeout(()=>{b.style.width=b.dataset.w+'%'},50);
+  });
+}
+
+function renderSentInvites(){
+  const el=document.getElementById('sent-invites');
+  // In a real app, fetch from API endpoint for sent invites
+  el.innerHTML='<div style="padding:12px;color:var(--text2);font-size:12px">No pending invites</div>';
+}
+
+function renderTeamSuggestions(){
+  const el=document.getElementById('team-suggestions');
+  const sugg=getFilteredMatches().filter(u=>u.filter.some(f=>['blockchain','uiux'].includes(f))).slice(0,2);
+  el.innerHTML=sugg.map(u=>`
+    <div class="inv-row" style="margin-bottom:8px">
+      <div class="av" style="width:36px;height:36px;font-size:12px;background:${u.color}">${u.initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${u.name}</div>
+        <div style="font-size:11px;color:var(--text2)">${u.role} · ${u.score}% match</div>
+      </div>
+      <button class="btn btn-primary btn-sm" style="font-size:11px" onclick="sendTeamInvite('${u._id}','${u.name.replace(/'/g,"\\'")}')">Invite</button>
+    </div>`).join('');
+}
+
+async function sendTeamInvite(userId,userName){
+  try{
+    // Get first team or create one
+    const teams=await apiCall('/teams');
+    if(teams.length===0){
+      toast('⚠️','Create a team first','warning');
+      return;
+    }
+    const teamId=teams[0]._id;
+    await apiCall(`/teams/${teamId}/members`,'POST',{userId});
+    toast('🎉',`Invited ${userName} to your team!`,'success');
+  }catch(err){
+    toast('❌','Failed to send invite','error');
+    console.error('Invite error:',err);
+  }
+}
+
+async function sendInvite(userName){
+  // Alias for sendTeamInvite for backwards compatibility
+  const user=USERS.find(u=>u.name===userName);
+  if(user)await sendTeamInvite(user._id,userName);
+}
+
+function copyTeamLink(){
+  try{navigator.clipboard.writeText('https://devmatch.app/team/nexus-ai-2025')}catch(e){}
+  toast('🔗','Team link copied to clipboard!','success');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHAT
+═══════════════════════════════════════════════════════════════ */
+let activeConvo=1;
+const AUTO_REPLIES=[
+  "Absolutely! Let's build something amazing together 🚀",
+  "That's a great idea! What tech stack are you thinking?",
+  "Count me in! I've been looking for a full-stack partner.",
+  "Love the energy! When do you want to start?",
+  "Yes! Let's schedule a quick call to align on the project.",
+  "100%! Your fintech background + my ML skills = winning combo 🏆",
+];
+let replyIdx=0;
+
+function renderConvoList(){
+  const el=document.getElementById('convo-list');
+  el.innerHTML=CONVERSATIONS.map(c=>`
+    <div class="convo-item ${c.id===activeConvo?'active':''}" onclick="selectConvo(${c.id})">
+      <div style="position:relative">
+        <div class="av" style="width:40px;height:40px;font-size:13px;border-radius:11px;background:${c.color}">${c.initials}</div>
+        ${c.online?`<div style="position:absolute;bottom:-1px;right:-1px;width:9px;height:9px;background:var(--green);border-radius:50%;border:2px solid var(--bg2)"></div>`:''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${c.unread?600:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+        <div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.last}</div>
+      </div>
+      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+        <div style="font-size:10px;color:var(--text3)">${c.time}</div>
+        ${c.unread?'<div style="width:7px;height:7px;background:var(--accent2);border-radius:50%"></div>':''}
+      </div>
+    </div>`).join('');
+}
+
+function selectConvo(id){
+  activeConvo=id;
+  const c=CONVERSATIONS.find(x=>x.id===id);
+  if(c){
+    document.getElementById('chat-peer-name').textContent=c.name;
+    const av=document.getElementById('chat-peer-av');
+    av.textContent=c.initials;av.style.background=c.color;
+  }
+  // Mark as read
+  const ci=CONVERSATIONS.find(x=>x.id===id);if(ci)ci.unread=false;
+  renderConvoList();
+}
+
+function renderChatMessages(){
+  const el=document.getElementById('chat-messages');
+  el.innerHTML=chatMessages.map(m=>`
+    <div class="msg ${m.from==='me'?'msg-me':'msg-them'}">
+      ${m.from!=='me'?`<div class="av" style="width:30px;height:30px;border-radius:8px;font-size:11px;font-weight:700;background:${m.color||'linear-gradient(135deg,#6c63ff,#a78bfa)'};flex-shrink:0">${m.av||'SR'}</div>`:''}
+      <div>
+        <div class="bubble ${m.from==='me'?'bubble-me':'bubble-them'}">${m.text}</div>
+        <div class="msg-time" style="${m.from==='me'?'text-align:right':''}">${m.time}</div>
+      </div>
+    </div>`).join('');
+  el.scrollTop=el.scrollHeight;
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('chat-inp');
+  const txt=inp.value.trim();if(!txt)return;
+  if(!activeConvo)return;
+
+  chatMessages.push({from:'me',text:txt,time:'just now'});
+  inp.value='';
+  renderChatMessages();
+
+  try{
+    // Save message to backend
+    const convo=CONVERSATIONS.find(c=>c.id===activeConvo);
+    if(convo){
+      // In a real app, would need to get recipient user ID
+      // For now, just store locally
+      await apiCall(`/users/${MY_PROFILE._id}`,  'PUT',{bio:MY_PROFILE.bio});
+    }
+
+    // Auto-reply with typing indicator
+    const el=document.getElementById('chat-messages');
+    const typing=document.createElement('div');
+    typing.className='msg msg-them';
+    const activeUser=CONVERSATIONS.find(c=>c.id===activeConvo);
+    typing.innerHTML=`<div class="av" style="width:30px;height:30px;border-radius:8px;font-size:11px;font-weight:700;background:${activeUser?activeUser.color:'linear-gradient(135deg,#6c63ff,#a78bfa)'">${activeUser?activeUser.initials:'SR'}</div><div><div class="bubble bubble-them"><div class="ai-typing"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div></div></div></div>`;
+    el.appendChild(typing);el.scrollTop=el.scrollHeight;
+
+    setTimeout(()=>{
+      typing.remove();
+      chatMessages.push({from:'them',text:AUTO_REPLIES[replyIdx%AUTO_REPLIES.length],time:'just now',av:activeUser?activeUser.initials:'SR',color:activeUser?activeUser.color:'linear-gradient(135deg,#6c63ff,#a78bfa)'});
+      replyIdx++;renderChatMessages();
+    },900+Math.random()*700);
+  }catch(err){
+    console.error('Message error:',err);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AI ADVISOR (Real Claude API)
+═══════════════════════════════════════════════════════════════ */
+const AI_SYSTEM=`You are DevMatch's AI Match Advisor — a smart, friendly assistant embedded in a hackathon teammate matching platform.
+
+Current user profile:
+- Name: ${MY_PROFILE.name}
+- Role: ${MY_PROFILE.role}
+- Skills: ${MY_PROFILE.skills.join(', ')}
+- Experience: ${MY_PROFILE.exp}
+- Domain: ${MY_PROFILE.domain}
+- Goal: ${MY_PROFILE.goal}
+- Availability: ${MY_PROFILE.avail}
+
+Available candidates:
+${USERS.map(u=>`- ${u.name}: ${u.role}, ${u.exp}, domain: ${u.domain}, skills: ${u.skills.join(', ')}, goal: ${u.goal}, availability: ${u.avail}, match score: ${computeScore(u,MY_PROFILE)}%`).join('\n')}
+
+Matching algorithm weights: Skill overlap 35%, Complementary role 20%, Domain match 15%, Experience similarity 10%, Availability match 10%, Goal alignment 10%.
+
+Answer questions about teammate matching, team strategy, and hackathon tips. Be concise, specific, and reference real candidates/scores. Use emojis sparingly. Respond in 2-4 short paragraphs max.`;
+
+function renderAIPage(){
+  const el=document.getElementById('ai-chat');
+  el.innerHTML=`<div class="ai-msg">👋 Hi ${MY_PROFILE.name}! I'm your AI Match Advisor. I've analyzed all 8 candidates against your profile using our weighted compatibility algorithm. Your top match is <strong>Sophia Rahman at ${computeScore(USERS[0],MY_PROFILE)}%</strong> — she fills your ML/AI gap perfectly. Ask me anything about your matches, team strategy, or skills to develop!</div>`;
+  renderAIBreakdown();
+  renderAIFactors();
+}
+
+function renderAIBreakdown(){
+  const el=document.getElementById('ai-breakdown');
+  const matches=getFilteredMatches().slice(0,4);
+  el.innerHTML=matches.map(u=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px;border-radius:10px;margin-bottom:6px;background:var(--glass);border:1px solid var(--border)">
+      <div class="av" style="width:34px;height:34px;font-size:11px;border-radius:9px;background:${u.color}">${u.initials}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600">${u.name}</div>
+        <div style="font-size:10px;color:var(--text2)">${u.role}</div>
+      </div>
+      <div style="width:44px">
+        <div style="height:4px;background:rgba(255,255,255,.07);border-radius:100px;overflow:hidden;margin-bottom:3px"><div style="height:100%;width:${u.score}%;background:${u.score>=90?'var(--green)':u.score>=80?'var(--accent2)':'var(--amber)'};border-radius:100px"></div></div>
+        <div style="font-size:11px;font-weight:700;color:${u.score>=90?'var(--green)':u.score>=80?'var(--accent2)':'var(--amber)'};text-align:right">${u.score}%</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderAIFactors(){
+  const el=document.getElementById('ai-factors');
+  const factors=[
+    {name:'Skill Overlap',weight:'35%',score:72,desc:'3 shared skills avg.'},
+    {name:'Role Complement',weight:'20%',score:88,desc:'Strong FE/BE/ML coverage'},
+    {name:'Domain Match',weight:'15%',score:65,desc:'Fintech + AI overlap'},
+    {name:'Experience',weight:'10%',score:80,desc:'Mostly Advanced matches'},
+    {name:'Availability',weight:'10%',score:90,desc:'Full-time dominant pool'},
+    {name:'Goal Alignment',weight:'10%',score:75,desc:'Win-focused majority'},
+  ];
+  el.innerHTML=factors.map(f=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:500">${f.name} <span style="color:var(--text3);font-weight:400">(${f.weight})</span></div>
+        <div style="font-size:12px;color:var(--accent2)">${f.score}%</div>
+      </div>
+      <div class="pb-wrap"><div class="pb" style="width:${f.score}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:2px">${f.desc}</div>
+    </div>`).join('');
+  // Animate bars
+  setTimeout(()=>document.querySelectorAll('.pb').forEach(b=>b.style.width=b.style.width),100);
+}
+
+async function askAI(){
+  const inp=document.getElementById('ai-input');
+  const q=inp.value.trim();if(!q)return;
+  addAIMessage('user',q);
+  inp.value='';
+  const el=document.getElementById('ai-chat');
+  const typingEl=document.createElement('div');
+  typingEl.className='ai-msg';
+  typingEl.innerHTML='<div class="ai-typing"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div></div>';
+  el.appendChild(typingEl);el.scrollTop=el.scrollHeight;
+  const sendBtn=document.getElementById('ai-send-btn');
+  sendBtn.disabled=true;sendBtn.innerHTML='<div class="spinner"></div>';
+  // Update system with current profile
+  const system=`You are DevMatch's AI Match Advisor — a smart, friendly assistant embedded in a hackathon teammate matching platform.\n\nCurrent user profile:\n- Name: ${MY_PROFILE.name}\n- Role: ${MY_PROFILE.role}\n- Skills: ${MY_PROFILE.skills.join(', ')}\n- Experience: ${MY_PROFILE.exp}\n- Domain: ${MY_PROFILE.domain}\n- Goal: ${MY_PROFILE.goal}\n- Availability: ${MY_PROFILE.avail}\n\nAvailable candidates:\n${USERS.map(u=>`- ${u.name}: ${u.role}, ${u.exp}, domain: ${u.domain}, skills: ${u.skills.join(', ')}, goal: ${u.goal}, availability: ${u.avail}, match score: ${computeScore(u,MY_PROFILE)}%`).join('\n')}\n\nMatching algorithm weights: Skill overlap 35%, Complementary role 20%, Domain match 15%, Experience similarity 10%, Availability match 10%, Goal alignment 10%.\n\nAnswer questions about teammate matching, team strategy, and hackathon tips. Be concise, specific, and reference real candidates/scores. Use emojis sparingly. Respond in 2-4 short paragraphs max.`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:system,
+        messages:[...aiChatHistory,{role:'user',content:q}],
+      })
+    });
+    const data=await res.json();
+    typingEl.remove();
+    const reply=data.content?.[0]?.text||'Sorry, I could not process that. Please try again.';
+    aiChatHistory.push({role:'user',content:q},{role:'assistant',content:reply});
+    addAIMessage('assistant',reply);
+  }catch(e){
+    typingEl.remove();
+    addAIMessage('assistant','⚠️ Could not connect to AI. Make sure you\'re running with API access. Here\'s a local answer: Your top match is Sophia Rahman ('+computeScore(USERS[0],MY_PROFILE)+'%) because she has complementary ML/AI skills that perfectly fill your team\'s gap.');
+  }
+  sendBtn.disabled=false;sendBtn.textContent='Ask AI';
+}
+
+function addAIMessage(role,text){
+  const el=document.getElementById('ai-chat');
+  const div=document.createElement('div');
+  if(role==='user'){
+    div.style.cssText='background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 16px;font-size:13px;line-height:1.6;margin-bottom:8px;color:var(--text2)';
+    div.innerHTML=`<span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px">You</span>${text}`;
+  }else{
+    div.className='ai-msg';
+    div.innerHTML=`<span style="font-size:10px;font-weight:600;color:var(--accent2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">AI Advisor</span>${text.replace(/\n/g,'<br>')}`;
+  }
+  el.appendChild(div);el.scrollTop=el.scrollHeight;
+}
+
+function aiQuickQ(q){
+  document.getElementById('ai-input').value=q;
+  askAI();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROFILE PAGE
+═══════════════════════════════════════════════════════════════ */
+function renderProfilePage(){
+  updateProfileDisplay();
+  renderSkillSelector();
+}
+
+function updateProfileDisplay(){
+  const ini=MY_PROFILE.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('prof-av').textContent=ini;
+  document.getElementById('prof-av').style.background=MY_PROFILE.color;
+  document.getElementById('topbar-avatar').textContent=ini;
+  document.getElementById('prof-name').textContent=MY_PROFILE.name;
+  document.getElementById('prof-role-exp').textContent=`${MY_PROFILE.role} · ${MY_PROFILE.exp} · ${MY_PROFILE.domain}`;
+  document.getElementById('prof-bio').textContent=MY_PROFILE.bio;
+  document.getElementById('prof-skills').innerHTML=MY_PROFILE.skills.map(s=>`<span class="skill-tag" style="margin-bottom:4px">${s}</span>`).join('');
+  document.getElementById('prof-badges').innerHTML=`<span class="badge b-purple">${MY_PROFILE.role}</span><span class="badge b-green">${MY_PROFILE.avail}</span>`;
+  document.getElementById('pref-exp').textContent=MY_PROFILE.exp;
+  document.getElementById('pref-goal').textContent=MY_PROFILE.goal;
+  document.getElementById('pref-avail').textContent=MY_PROFILE.avail;
+  document.getElementById('pref-domain').textContent=MY_PROFILE.domain;
+  // Completion
+  const comp=calcCompletion();
+  document.getElementById('comp-pct').textContent=comp+'%';
+  document.getElementById('comp-pct2').textContent=comp+'%';
+  document.getElementById('comp-bar').style.width=comp+'%';
+  // Circle dash
+  const r=33,circ=2*Math.PI*r;
+  const offset=circ*(1-comp/100);
+  const circle=document.getElementById('comp-circle');
+  if(circle)circle.setAttribute('stroke-dashoffset',offset.toFixed(1));
+}
+
+function calcCompletion(){
+  let score=0;
+  if(MY_PROFILE.name)score+=15;
+  if(MY_PROFILE.bio&&MY_PROFILE.bio.length>20)score+=15;
+  if(MY_PROFILE.skills.length>=3)score+=20;
+  if(MY_PROFILE.role)score+=10;
+  if(MY_PROFILE.exp)score+=10;
+  if(MY_PROFILE.domain)score+=10;
+  if(MY_PROFILE.goal)score+=10;
+  if(MY_PROFILE.avail)score+=10;
+  return score;
+}
+
+function renderSkillSelector(){
+  const el=document.getElementById('skill-selector');
+  el.innerHTML=ALL_SKILLS.map(s=>`<span class="skill-sel ${MY_PROFILE.skills.includes(s)?'on':''}" onclick="toggleSkill('${s}',this)">${s}</span>`).join('');
+}
+
+function toggleSkill(s,el){
+  if(MY_PROFILE.skills.includes(s)){
+    MY_PROFILE.skills=MY_PROFILE.skills.filter(x=>x!==s);
+    el.classList.remove('on');
+  }else{
+    MY_PROFILE.skills.push(s);
+    el.classList.add('on');
+  }
+  liveUpdateProfile();
+}
+
+function liveUpdateProfile(){
+  MY_PROFILE.name=document.getElementById('f-name').value||MY_PROFILE.name;
+  MY_PROFILE.bio=document.getElementById('f-bio').value||MY_PROFILE.bio;
+  MY_PROFILE.role=document.getElementById('f-role').value;
+  MY_PROFILE.exp=document.getElementById('f-exp').value;
+  MY_PROFILE.domain=document.getElementById('f-domain').value;
+  MY_PROFILE.goal=document.getElementById('f-goal').value;
+  MY_PROFILE.avail=document.getElementById('f-avail').value;
+  updateProfileDisplay();
+}
+
+async function saveProfile(){
+  liveUpdateProfile();
+  try{
+    // Save profile to backend
+    await apiCall(`/users/${MY_PROFILE._id}`,'PUT',{
+      name:MY_PROFILE.name,
+      bio:MY_PROFILE.bio,
+      role:MY_PROFILE.role,
+      experience:MY_PROFILE.exp,
+      location:MY_PROFILE.domain,
+      skills:MY_PROFILE.skills,
+    });
+
+    // Re-render match scores with updated profile
+    USERS=USERS.map(u=>({...u,score:computeScore(u,MY_PROFILE),why:generateMatchReason(u,MY_PROFILE)}));
+
+    renderStats();
+    renderDashMatches();
+    renderMatchGrid(getFilteredMatches());
+    renderTeamSuggestions();
+    renderAIPage();
+    toast('✅','Profile saved! Match scores updated.','success');
+  }catch(err){
+    toast('❌','Failed to save profile','error');
+    console.error('Save error:',err);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEARCH
+═══════════════════════════════════════════════════════════════ */
+function handleSearch(v){
+  if(!v.trim()){renderMatchGrid(getFilteredMatches());return}
+  const q=v.toLowerCase();
+  const res=USERS.filter(u=>
+    u.name.toLowerCase().includes(q)||
+    u.role.toLowerCase().includes(q)||
+    u.domain.toLowerCase().includes(q)||
+    u.skills.some(s=>s.toLowerCase().includes(q))||
+    u.exp.toLowerCase().includes(q)
+  ).map(u=>({...u,score:computeScore(u,MY_PROFILE)}));
+  if(!document.getElementById('page-discover').classList.contains('active'))goPage('discover');
+  renderMatchGrid(res);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MISC
+═══════════════════════════════════════════════════════════════ */
+function toggleNotif(){
+  toast('🔔','3 new match requests + 2 team invites','info');
+}
+</script>
+</body>
+</html>
