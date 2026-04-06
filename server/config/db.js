@@ -1,18 +1,16 @@
-import mongoose from 'mongoose';
+import { supabase } from '../../lib/supabase.js';
 
 const connectDB = async () => {
     try {
-        const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/devmatch';
-        
-        await mongoose.connect(mongoURI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-
-        console.log('MongoDB connected successfully');
-        return mongoose.connection;
+        // Test connection by checking if we can access the database
+        const { data, error } = await supabase.from('users').select('count').limit(1);
+        if (error) {
+            throw error;
+        }
+        console.log('Supabase connected successfully');
+        return supabase;
     } catch (error) {
-        console.error('MongoDB connection failed:', error);
+        console.error('Supabase connection failed:', error);
         process.exit(1);
     }
 };

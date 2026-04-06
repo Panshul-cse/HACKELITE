@@ -4,23 +4,28 @@ import User from '../models/User.js';
 export const getAllUsers = async (req, res) => {
     try {
         const { skills, experience, location } = req.query;
-        const filters = { isActive: true };
 
+        let users = await User.find();
+
+        // Apply filters
         if (skills) {
-            filters.skills = { $in: skills.split(',').map(s => s.trim()) };
+            const skillArray = skills.split(',').map(s => s.trim());
+            users = users.filter(user => 
+                user.skills.some(skill => skillArray.includes(skill))
+            );
         }
 
         if (experience) {
-            filters.experience = experience;
+            users = users.filter(user => user.experience === experience);
         }
 
         if (location) {
-            filters.location = { $regex: location, $options: 'i' };
+            const locationRegex = new RegExp(location, 'i');
+            users = users.filter(user => locationRegex.test(user.location));
         }
 
-        const users = await User.find(filters)
-            .select('-password')
-            .limit(50);
+        // Limit results
+        users = users.slice(0, 50);
 
         return res.status(200).json({
             data: users,
@@ -36,15 +41,24 @@ export const getUserById = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const user = await User.findById(userId)
-            .populate('teams')
-            .populate('connections');
-
+        const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        return res.status(200).json(user);
+        // Get connections and teams
+        const [connections, teams] = await Promise.all([
+            user.getConnections(),
+            user.getTeams()
+        ]);
+
+        const userWithRelations = {
+            ...user,
+            connections,
+            teams
+        };
+
+        return res.status(200).json(userWithRelations);
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching user', error: error.message });
     }
@@ -64,11 +78,12 @@ export const updateUser = async (req, res) => {
         if (experience) updateData.experience = experience;
         if (skills) updateData.skills = Array.isArray(skills) ? skills : skills.split(',').map(s => s.trim());
 
-        const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
-
+        const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
+
+        await user.update(updateData);
 
         return res.status(200).json({
             message: 'User updated successfully',
@@ -97,16 +112,15 @@ export const addConnection = async (req, res) => {
         }
 
         // Check if already connected
-        if (user.connections.includes(targetUserId)) {
+        const connections = await user.getConnections();
+        if (connections.some(conn => conn.id === targetUserId)) {
             return res.status(400).json({ message: 'Already connected' });
         }
 
-        user.connections.push(targetUserId);
-        await user.save();
+        await user.addConnection(targetUserId);
 
         return res.status(200).json({
             message: 'Connection added successfully',
-            user,
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error adding connection', error: error.message });
@@ -124,12 +138,10 @@ export const removeConnection = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        user.connections = user.connections.filter(id => id.toString() !== targetUserId);
-        await user.save();
+        await user.removeConnection(targetUserId);
 
         return res.status(200).json({
             message: 'Connection removed successfully',
-            user,
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error removing connection', error: error.message });
@@ -141,15 +153,17 @@ export const getConnections = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const user = await User.findById(userId).populate('connections');
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        const connections = await user.getConnections();
+
         return res.status(200).json({
-            connections: user.connections,
-            count: user.connections.length,
+            connections,
+            count: connections.length,
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching connections', error: error.message });
@@ -161,19 +175,17 @@ export const incrementProfileViews = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const user = await User.findByIdAndUpdate(
-            userId,
-            { $inc: { profileViews: 1 } },
-            { new: true }
-        );
+        const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        const profileViews = await user.incrementProfileViews();
+
         return res.status(200).json({
             message: 'Profile views updated',
-            profileViews: user.profileViews,
+            profileViews,
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error updating profile views', error: error.message });

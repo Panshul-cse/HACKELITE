@@ -1,15 +1,16 @@
+import dotenv from 'dotenv';
+
+// Load environment variables FIRST
+dotenv.config({ path: '../.env' });
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import matchRoutes from './routes/matchRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
-
-// Load environment variables
-dotenv.config();
 
 // Create Express app
 const app = express();

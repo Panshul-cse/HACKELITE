@@ -21,7 +21,7 @@ export const signup = async (req, res) => {
         }
 
         // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findByEmail(email);
         if (existingUser) {
             return res.status(400).json({ message: 'Email already registered' });
         }
@@ -37,7 +37,7 @@ export const signup = async (req, res) => {
         await user.save();
 
         // Generate token
-        const token = generateToken(user._id);
+        const token = generateToken(user.id);
 
         return res.status(201).json({
             message: 'User created successfully',
@@ -61,7 +61,7 @@ export const login = async (req, res) => {
         }
 
         // Find user by email
-        const user = await User.findOne({ email }).select('+password');
+        const user = await User.findByEmail(email);
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -73,7 +73,7 @@ export const login = async (req, res) => {
         }
 
         // Generate token
-        const token = generateToken(user._id);
+        const token = generateToken(user.id);
 
         return res.status(200).json({
             message: 'Login successful',

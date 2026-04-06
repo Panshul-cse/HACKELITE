@@ -6,15 +6,7 @@ export const getMyTeams = async (req, res) => {
     try {
         const userId = req.user.userId;
 
-        const teams = await Team.find({
-            $or: [
-                { createdBy: userId },
-                { members: userId }
-            ]
-        })
-        .populate('createdBy', '-password')
-        .populate('members', '-password')
-        .sort({ createdAt: -1 });
+        const teams = await Team.findByUser(userId);
 
         return res.status(200).json(teams);
     } catch (error) {
@@ -27,16 +19,23 @@ export const getTeam = async (req, res) => {
     try {
         const { teamId } = req.params;
 
-        const team = await Team.findById(teamId)
-            .populate('createdBy', '-password')
-            .populate('members', '-password')
-            .populate('invitations.user', '-password');
-
+        const team = await Team.findById(teamId);
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        return res.status(200).json(team);
+        const [members, invitations] = await Promise.all([
+            team.getMembers(),
+            team.getInvitations()
+        ]);
+
+        const teamWithRelations = {
+            ...team,
+            members,
+            invitations
+        };
+
+        return res.status(200).json(teamWithRelations);
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching team', error: error.message });
     }
@@ -56,20 +55,13 @@ export const createTeam = async (req, res) => {
             name,
             description,
             role,
-            requiredSkills: requiredSkills ? requiredSkills.split(',').map(s => s.trim()) : [],
-            targetSize: targetSize || 5,
-            createdBy: userId,
-            members: [userId]
+            required_skills: requiredSkills ? requiredSkills.split(',').map(s => s.trim()) : [],
+            target_size: targetSize || 5,
+            created_by: userId
         });
 
         await team.save();
-        await team.populate('createdBy', '-password');
-        await team.populate('members', '-password');
-
-        // Add team to user's teams
-        await User.findByIdAndUpdate(userId, {
-            $push: { teams: team._id }
-        });
+        await team.addMember(userId);
 
         return res.status(201).json({
             message: 'Team created successfully',
@@ -93,20 +85,19 @@ export const updateTeam = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        if (team.createdBy.toString() !== userId) {
+        if (team.created_by !== userId) {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-        if (name) team.name = name;
-        if (description) team.description = description;
-        if (role) team.role = role;
-        if (requiredSkills) team.requiredSkills = requiredSkills.split(',').map(s => s.trim());
-        if (targetSize) team.targetSize = targetSize;
-        if (status) team.status = status;
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (description) updateData.description = description;
+        if (role) updateData.role = role;
+        if (requiredSkills) updateData.required_skills = requiredSkills.split(',').map(s => s.trim());
+        if (targetSize) updateData.target_size = targetSize;
+        if (status) updateData.status = status;
 
-        await team.save();
-        await team.populate('createdBy', '-password');
-        await team.populate('members', '-password');
+        await team.update(updateData);
 
         return res.status(200).json({
             message: 'Team updated successfully',
@@ -129,17 +120,11 @@ export const deleteTeam = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        if (team.createdBy.toString() !== userId) {
+        if (team.created_by !== userId) {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-        // Remove team from all members' teams array
-        await User.updateMany(
-            { _id: { $in: team.members } },
-            { $pull: { teams: teamId } }
-        );
-
-        await Team.findByIdAndDelete(teamId);
+        await team.delete();
 
         return res.status(200).json({ message: 'Team deleted successfully' });
     } catch (error) {
@@ -160,26 +145,19 @@ export const addTeamMember = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        if (team.createdBy.toString() !== userId) {
+        if (team.created_by !== userId) {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-        if (team.members.includes(newMemberId)) {
+        const members = await team.getMembers();
+        if (members.some(member => member.id === newMemberId)) {
             return res.status(400).json({ message: 'User already in team' });
         }
 
-        team.members.push(newMemberId);
-        await team.save();
-        await team.populate('members', '-password');
-
-        // Add team to user's teams
-        await User.findByIdAndUpdate(newMemberId, {
-            $push: { teams: teamId }
-        });
+        await team.addMember(newMemberId);
 
         return res.status(200).json({
-            message: 'Team member added successfully',
-            team
+            message: 'Team member added successfully'
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error adding team member', error: error.message });
@@ -198,22 +176,14 @@ export const removeTeamMember = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        if (team.createdBy.toString() !== userId) {
+        if (team.created_by !== userId) {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
-        team.members = team.members.filter(id => id.toString() !== memberToRemove);
-        await team.save();
-        await team.populate('members', '-password');
-
-        // Remove team from user's teams
-        await User.findByIdAndUpdate(memberToRemove, {
-            $pull: { teams: teamId }
-        });
+        await team.removeMember(memberToRemove);
 
         return res.status(200).json({
-            message: 'Team member removed successfully',
-            team
+            message: 'Team member removed successfully'
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error removing team member', error: error.message });
@@ -225,16 +195,17 @@ export const getTeamMembers = async (req, res) => {
     try {
         const { teamId } = req.params;
 
-        const team = await Team.findById(teamId)
-            .populate('members', '-password');
+        const team = await Team.findById(teamId);
 
         if (!team) {
             return res.status(404).json({ message: 'Team not found' });
         }
 
+        const members = await team.getMembers();
+
         return res.status(200).json({
-            members: team.members,
-            count: team.members.length
+            members,
+            count: members.length
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching team members', error: error.message });
@@ -254,22 +225,24 @@ export const sendInvitation = async (req, res) => {
             return res.status(404).json({ message: 'Team not found' });
         }
 
-        if (team.createdBy.toString() !== userId) {
+        if (team.created_by !== userId) {
             return res.status(403).json({ message: 'Unauthorized' });
         }
 
         // Check if already invited or is member
-        const alreadyInvited = team.invitations.some(inv => inv.user.toString() === inviteeId);
-        if (alreadyInvited || team.members.includes(inviteeId)) {
+        const members = await team.getMembers();
+        const invitations = await team.getInvitations();
+        const alreadyInvited = invitations.some(inv => inv.user_id === inviteeId);
+        const isMember = members.some(member => member.id === inviteeId);
+
+        if (alreadyInvited || isMember) {
             return res.status(400).json({ message: 'User already invited or is a member' });
         }
 
-        team.invitations.push({ user: inviteeId });
-        await team.save();
+        await team.sendInvitation(inviteeId);
 
         return res.status(200).json({
-            message: 'Invitation sent successfully',
-            team
+            message: 'Invitation sent successfully'
         });
     } catch (error) {
         return res.status(500).json({ message: 'Error sending invitation', error: error.message });
